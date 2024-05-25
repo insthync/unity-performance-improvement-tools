@@ -55,7 +55,7 @@ namespace Insthync.PerformanceImprovementTools
             {
                 GUILayout.BeginHorizontal();
 
-                if (GUILayout.Button($"Object ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(200)))
+                if (GUILayout.Button("Object" + (_sortMode == SortMode.ByObject ? $"({_sortOrder})" : string.Empty), EditorStyles.boldLabel, GUILayout.Width(200)))
                 {
                     if (_sortMode == SortMode.ByObject)
                         _sortOrder = _sortOrder == SortOrder.Desc ? SortOrder.Asc : SortOrder.Desc;
@@ -65,7 +65,7 @@ namespace Insthync.PerformanceImprovementTools
                     SortMeshes();
                 }
 
-                if (GUILayout.Button($"Tri Count ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(125)))
+                if (GUILayout.Button("Tri Count " + (_sortMode == SortMode.ByTriCount ? $"({_sortOrder})" : string.Empty), EditorStyles.boldLabel, GUILayout.Width(125)))
                 {
                     if (_sortMode == SortMode.ByTriCount)
                         _sortOrder = _sortOrder == SortOrder.Desc ? SortOrder.Asc : SortOrder.Desc;
@@ -75,7 +75,7 @@ namespace Insthync.PerformanceImprovementTools
                     SortMeshes();
                 }
 
-                if (GUILayout.Button($"Prefab Usage ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(125)))
+                if (GUILayout.Button("Prefab Usage " + (_sortMode == SortMode.ByUsage ? $"({_sortOrder})" : string.Empty), EditorStyles.boldLabel, GUILayout.Width(125)))
                 {
                     if (_sortMode == SortMode.ByUsage)
                         _sortOrder = _sortOrder == SortOrder.Desc ? SortOrder.Asc : SortOrder.Desc;
@@ -85,7 +85,7 @@ namespace Insthync.PerformanceImprovementTools
                     SortMeshes();
                 }
 
-                GUILayout.Label("Prefab", EditorStyles.boldLabel, GUILayout.Width(200));
+                GUILayout.Label("Prefab ", EditorStyles.boldLabel, GUILayout.Width(200));
 
                 GUILayout.EndHorizontal();
 
