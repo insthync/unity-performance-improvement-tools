@@ -9,19 +9,34 @@ namespace Insthync.PerformanceImprovementTools
     {
         public enum SortMode
         {
-            ByName,
+            ByObject,
             ByTriCount,
+            ByUsage,
         }
         public enum SortOrder
         {
             Asc,
             Desc,
         }
-        private List<Component> _meshComponents = new List<Component>();
-        private List<KeyValuePair<int, Mesh>> _meshes = new List<KeyValuePair<int, Mesh>>();
+        public class MeshInfo
+        {
+            public Component component;
+            public GameObject prefab;
+            public Mesh mesh;
+        }
+        private Dictionary<GameObject, int> _usages = new Dictionary<GameObject, int>();
+        private List<MeshInfo> _meshes = new List<MeshInfo>();
         private Vector2 _scrollPos;
-        private SortMode _sortMode = SortMode.ByName;
+        private SortMode _sortMode = SortMode.ByObject;
         private SortOrder _sortOrder = SortOrder.Asc;
+
+
+        public int GetUsage(MeshInfo mesh)
+        {
+            if (mesh == null || mesh.prefab == null || !_usages.TryGetValue(mesh.prefab, out int usage))
+                usage = 1;
+            return usage;
+        }
 
         [MenuItem("Tools/In-Scenes Tri Counter")]
         public static void ShowWindow()
@@ -40,13 +55,13 @@ namespace Insthync.PerformanceImprovementTools
             {
                 GUILayout.BeginHorizontal();
 
-                if (GUILayout.Button($"Name ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(300)))
+                if (GUILayout.Button($"Object ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(200)))
                 {
-                    if (_sortMode == SortMode.ByName)
+                    if (_sortMode == SortMode.ByObject)
                         _sortOrder = _sortOrder == SortOrder.Desc ? SortOrder.Asc : SortOrder.Desc;
                     else
                         _sortOrder = SortOrder.Asc;
-                    _sortMode = SortMode.ByName;
+                    _sortMode = SortMode.ByObject;
                     SortMeshes();
                 }
 
@@ -60,24 +75,35 @@ namespace Insthync.PerformanceImprovementTools
                     SortMeshes();
                 }
 
+                if (GUILayout.Button($"Usage ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(125)))
+                {
+                    if (_sortMode == SortMode.ByUsage)
+                        _sortOrder = _sortOrder == SortOrder.Desc ? SortOrder.Asc : SortOrder.Desc;
+                    else
+                        _sortOrder = SortOrder.Asc;
+                    _sortMode = SortMode.ByUsage;
+                    SortMeshes();
+                }
+
                 GUILayout.Label("Prefab", EditorStyles.boldLabel, GUILayout.Width(200));
 
                 GUILayout.EndHorizontal();
 
                 _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
-                foreach (KeyValuePair<int, Mesh> mesh in _meshes)
+                foreach (MeshInfo mesh in _meshes)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label(mesh.Value.name, GUILayout.Width(300));
-                    GUILayout.Label(mesh.Value.triangles.Length.ToString("N0"), GUILayout.Width(125));
-                    GameObject tempPrefab = null;
-                    GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(_meshComponents[mesh.Key]);
-                    if (tempInstanceRoot != null)
-                    {
-                        tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
-                    }
+                    // Object column
                     GUI.enabled = false;
-                    EditorGUILayout.ObjectField(tempPrefab, typeof(GameObject), false, GUILayout.Width(200));
+                    EditorGUILayout.ObjectField(mesh.component, typeof(GameObject), false, GUILayout.Width(200));
+                    GUI.enabled = true;
+                    // Tri count column
+                    GUILayout.Label(mesh.mesh.triangles.Length.ToString("N0"), GUILayout.Width(125));
+                    // Usage column
+                    GUILayout.Label(GetUsage(mesh).ToString("N0"), GUILayout.Width(125));
+                    // Prefab column
+                    GUI.enabled = false;
+                    EditorGUILayout.ObjectField(mesh.prefab, typeof(GameObject), false, GUILayout.Width(200));
                     GUI.enabled = true;
                     GUILayout.EndHorizontal();
                 }
@@ -88,8 +114,8 @@ namespace Insthync.PerformanceImprovementTools
 
         private void FindMeshes()
         {
-            _meshComponents.Clear();
             _meshes.Clear();
+            _usages.Clear();
             for (int i = 0; i < SceneManager.sceneCount; ++i)
             {
                 Scene scene = SceneManager.GetSceneAt(i);
@@ -103,14 +129,50 @@ namespace Insthync.PerformanceImprovementTools
                     MeshFilter[] meshFilters = rootGameObjects[j].GetComponentsInChildren<MeshFilter>();
                     foreach (MeshFilter meshFilter in meshFilters)
                     {
-                        _meshes.Add(new KeyValuePair<int, Mesh>(_meshComponents.Count, meshFilter.sharedMesh));
-                        _meshComponents.Add(meshFilter);
+                        GameObject tempPrefab = null;
+                        GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(meshFilter);
+                        if (tempInstanceRoot != null)
+                        {
+                            tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
+                        }
+                        MeshInfo mesh = new MeshInfo()
+                        {
+                            component = meshFilter,
+                            prefab = tempPrefab,
+                            mesh = meshFilter.sharedMesh,
+                        };
+                        _meshes.Add(mesh);
+                        if (tempPrefab != null)
+                        {
+                            if (!_usages.TryGetValue(tempPrefab, out int usage))
+                                usage = 1;
+                            usage++;
+                            _usages[tempPrefab] = usage;
+                        }
                     }
                     SkinnedMeshRenderer[] skinnedMeshes = rootGameObjects[j].GetComponentsInChildren<SkinnedMeshRenderer>();
                     foreach (SkinnedMeshRenderer skinnedMesh in skinnedMeshes)
                     {
-                        _meshes.Add(new KeyValuePair<int, Mesh>(_meshComponents.Count, skinnedMesh.sharedMesh));
-                        _meshComponents.Add(skinnedMesh);
+                        GameObject tempPrefab = null;
+                        GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(skinnedMesh);
+                        if (tempInstanceRoot != null)
+                        {
+                            tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
+                        }
+                        MeshInfo mesh = new MeshInfo()
+                        {
+                            component = skinnedMesh,
+                            prefab = tempPrefab,
+                            mesh = skinnedMesh.sharedMesh,
+                        };
+                        _meshes.Add(mesh);
+                        if (tempPrefab != null)
+                        {
+                            if (!_usages.TryGetValue(tempPrefab, out int usage))
+                                usage = 1;
+                            usage++;
+                            _usages[tempPrefab] = usage;
+                        }
                     }
                 }
             }
@@ -123,10 +185,13 @@ namespace Insthync.PerformanceImprovementTools
             switch (_sortMode)
             {
                 case SortMode.ByTriCount:
-                    _meshes.Sort((a, b) => (a.Value.triangles.Length).CompareTo(b.Value.triangles.Length));
+                    _meshes.Sort((a, b) => a.mesh.triangles.Length.CompareTo(b.mesh.triangles.Length));
+                    break;
+                case SortMode.ByUsage:
+                    _meshes.Sort((a, b) => GetUsage(a).CompareTo(GetUsage(b)));
                     break;
                 default:
-                    _meshes.Sort((a, b) => a.Value.name.CompareTo(b.Value.name));
+                    _meshes.Sort((a, b) => a.mesh.name.CompareTo(b.mesh.name));
                     break;
             }
             if (_sortOrder == SortOrder.Desc)
