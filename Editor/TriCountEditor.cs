@@ -24,7 +24,7 @@ namespace Insthync.PerformanceImprovementTools
             public GameObject prefab;
             public Mesh mesh;
         }
-        private Dictionary<GameObject, int> _usages = new Dictionary<GameObject, int>();
+        private Dictionary<GameObject, int> _prefabUsages = new Dictionary<GameObject, int>();
         private List<MeshInfo> _meshes = new List<MeshInfo>();
         private Vector2 _scrollPos;
         private SortMode _sortMode = SortMode.ByObject;
@@ -33,7 +33,7 @@ namespace Insthync.PerformanceImprovementTools
 
         public int GetUsage(MeshInfo mesh)
         {
-            if (mesh == null || mesh.prefab == null || !_usages.TryGetValue(mesh.prefab, out int usage))
+            if (mesh == null || mesh.prefab == null || !_prefabUsages.TryGetValue(mesh.prefab, out int usage))
                 usage = 1;
             return usage;
         }
@@ -75,7 +75,7 @@ namespace Insthync.PerformanceImprovementTools
                     SortMeshes();
                 }
 
-                if (GUILayout.Button($"Usage ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(125)))
+                if (GUILayout.Button($"Prefab Usage ({_sortOrder})", EditorStyles.boldLabel, GUILayout.Width(125)))
                 {
                     if (_sortMode == SortMode.ByUsage)
                         _sortOrder = _sortOrder == SortOrder.Desc ? SortOrder.Asc : SortOrder.Desc;
@@ -115,7 +115,8 @@ namespace Insthync.PerformanceImprovementTools
         private void FindMeshes()
         {
             _meshes.Clear();
-            _usages.Clear();
+            _prefabUsages.Clear();
+            List<GameObject> countedInstances = new List<GameObject>();
             for (int i = 0; i < SceneManager.sceneCount; ++i)
             {
                 Scene scene = SceneManager.GetSceneAt(i);
@@ -129,55 +130,42 @@ namespace Insthync.PerformanceImprovementTools
                     MeshFilter[] meshFilters = rootGameObjects[j].GetComponentsInChildren<MeshFilter>();
                     foreach (MeshFilter meshFilter in meshFilters)
                     {
-                        GameObject tempPrefab = null;
-                        GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(meshFilter);
-                        if (tempInstanceRoot != null)
-                        {
-                            tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
-                        }
-                        MeshInfo mesh = new MeshInfo()
-                        {
-                            component = meshFilter,
-                            prefab = tempPrefab,
-                            mesh = meshFilter.sharedMesh,
-                        };
-                        _meshes.Add(mesh);
-                        if (tempPrefab != null)
-                        {
-                            if (!_usages.TryGetValue(tempPrefab, out int usage))
-                                usage = 1;
-                            usage++;
-                            _usages[tempPrefab] = usage;
-                        }
+                        StoreMesh(countedInstances, meshFilter, (comp) => comp.sharedMesh);
                     }
                     SkinnedMeshRenderer[] skinnedMeshes = rootGameObjects[j].GetComponentsInChildren<SkinnedMeshRenderer>();
                     foreach (SkinnedMeshRenderer skinnedMesh in skinnedMeshes)
                     {
-                        GameObject tempPrefab = null;
-                        GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(skinnedMesh);
-                        if (tempInstanceRoot != null)
-                        {
-                            tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
-                        }
-                        MeshInfo mesh = new MeshInfo()
-                        {
-                            component = skinnedMesh,
-                            prefab = tempPrefab,
-                            mesh = skinnedMesh.sharedMesh,
-                        };
-                        _meshes.Add(mesh);
-                        if (tempPrefab != null)
-                        {
-                            if (!_usages.TryGetValue(tempPrefab, out int usage))
-                                usage = 1;
-                            usage++;
-                            _usages[tempPrefab] = usage;
-                        }
+                        StoreMesh(countedInstances, skinnedMesh, (comp) => comp.sharedMesh);
                     }
                 }
             }
 
             SortMeshes();
+        }
+
+        private void StoreMesh<T>(List<GameObject> countedInstances, T comp, System.Func<T, Mesh> getMesh) where T : Component
+        {
+            GameObject tempPrefab = null;
+            GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(comp);
+            if (tempInstanceRoot != null)
+            {
+                tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
+            }
+            MeshInfo mesh = new MeshInfo()
+            {
+                component = comp,
+                prefab = tempPrefab,
+                mesh = getMesh(comp),
+            };
+            _meshes.Add(mesh);
+            if (!countedInstances.Contains(tempInstanceRoot) && tempPrefab != null)
+            {
+                countedInstances.Add(tempInstanceRoot);
+                if (!_prefabUsages.TryGetValue(tempPrefab, out int usage))
+                    usage = 0;
+                usage++;
+                _prefabUsages[tempPrefab] = usage;
+            }
         }
 
         private void SortMeshes()
