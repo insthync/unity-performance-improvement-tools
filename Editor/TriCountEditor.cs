@@ -197,9 +197,6 @@ namespace Insthync.PerformanceImprovementTools
             switch (_sortMode)
             {
                 case SortMode.ByTriCount:
-                    _meshes.Sort((a, b) => a.mesh.triangles.Length.CompareTo(b.mesh.triangles.Length));
-                    break;
-                case SortMode.ByUsage:
                     _meshes.Sort((a, b) =>
                     {
                         if (a.mesh == null && b.mesh == null)
@@ -208,19 +205,22 @@ namespace Insthync.PerformanceImprovementTools
                             return -1;
                         else if (b.mesh == null)
                             return 1;
-                        return GetUsage(a).CompareTo(GetUsage(b));
+                        return a.mesh.triangles.Length.CompareTo(b.mesh.triangles.Length);
                     });
+                    break;
+                case SortMode.ByUsage:
+                    _meshes.Sort((a, b) => GetUsage(a).CompareTo(GetUsage(b)));
                     break;
                 default:
                     _meshes.Sort((a, b) =>
                     {
-                        if (a.mesh == null && b.mesh == null)
+                        if (a.component == null && b.component == null)
                             return 0;
-                        else if (a.mesh == null)
+                        else if (a.component == null)
                             return -1;
-                        else if (b.mesh == null)
+                        else if (b.component == null)
                             return 1;
-                        return a.mesh.name.CompareTo(b.mesh.name);
+                        return a.component.name.CompareTo(b.component.name);
                     });
                     break;
             }
