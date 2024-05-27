@@ -98,7 +98,10 @@ namespace Insthync.PerformanceImprovementTools
                     EditorGUILayout.ObjectField(mesh.component, typeof(GameObject), false, GUILayout.Width(200));
                     GUI.enabled = true;
                     // Tri count column
-                    GUILayout.Label(mesh.mesh.triangles.Length.ToString("N0"), GUILayout.Width(125));
+                    if (mesh.mesh != null)
+                        GUILayout.Label(mesh.mesh.triangles.Length.ToString("N0"), GUILayout.Width(125));
+                    else
+                        GUILayout.Label("NULL", GUILayout.Width(125));
                     // Usage column
                     GUILayout.Label(GetUsage(mesh).ToString("N0"), GUILayout.Width(125));
                     // Prefab column
@@ -148,9 +151,7 @@ namespace Insthync.PerformanceImprovementTools
             GameObject tempPrefab = null;
             GameObject tempInstanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(comp);
             if (tempInstanceRoot != null)
-            {
-                tempPrefab = PrefabUtility.GetCorrespondingObjectFromSource(tempInstanceRoot);
-            }
+                tempPrefab = PrefabUtility.GetCorrespondingObjectFromOriginalSource(tempInstanceRoot);
             MeshInfo mesh = new MeshInfo()
             {
                 component = comp,
@@ -176,10 +177,28 @@ namespace Insthync.PerformanceImprovementTools
                     _meshes.Sort((a, b) => a.mesh.triangles.Length.CompareTo(b.mesh.triangles.Length));
                     break;
                 case SortMode.ByUsage:
-                    _meshes.Sort((a, b) => GetUsage(a).CompareTo(GetUsage(b)));
+                    _meshes.Sort((a, b) =>
+                    {
+                        if (a.mesh == null && b.mesh == null)
+                            return 0;
+                        else if (a.mesh == null)
+                            return -1;
+                        else if (b.mesh == null)
+                            return 1;
+                        return GetUsage(a).CompareTo(GetUsage(b));
+                    });
                     break;
                 default:
-                    _meshes.Sort((a, b) => a.mesh.name.CompareTo(b.mesh.name));
+                    _meshes.Sort((a, b) =>
+                    {
+                        if (a.mesh == null && b.mesh == null)
+                            return 0;
+                        else if (a.mesh == null)
+                            return -1;
+                        else if (b.mesh == null)
+                            return 1;
+                        return a.mesh.name.CompareTo(b.mesh.name);
+                    });
                     break;
             }
             if (_sortOrder == SortOrder.Desc)
