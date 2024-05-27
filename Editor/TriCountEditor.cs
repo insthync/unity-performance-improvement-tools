@@ -29,7 +29,8 @@ namespace Insthync.PerformanceImprovementTools
         private Vector2 _scrollPos;
         private SortMode _sortMode = SortMode.ByObject;
         private SortOrder _sortOrder = SortOrder.Asc;
-
+        private int _currentPage = 0;
+        private int _itemsPerPage = 100;
 
         public int GetUsage(MeshInfo mesh)
         {
@@ -53,6 +54,21 @@ namespace Insthync.PerformanceImprovementTools
 
             if (_meshes.Count > 0)
             {
+                // Pagination controls
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Previous", GUILayout.Width(100)) && _currentPage > 0)
+                {
+                    _currentPage--;
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.Label($"Page {_currentPage + 1} of {Mathf.CeilToInt((float)_meshes.Count / _itemsPerPage)}");
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Next", GUILayout.Width(100)) && (_currentPage + 1) * _itemsPerPage < _meshes.Count)
+                {
+                    _currentPage++;
+                }
+                GUILayout.EndHorizontal();
+
                 GUILayout.BeginHorizontal();
 
                 if (GUILayout.Button("Object" + (_sortMode == SortMode.ByObject ? $"({_sortOrder})" : string.Empty), EditorStyles.boldLabel, GUILayout.Width(200)))
@@ -64,7 +80,7 @@ namespace Insthync.PerformanceImprovementTools
                     _sortMode = SortMode.ByObject;
                     SortMeshes();
                 }
-
+                GUILayout.FlexibleSpace();
                 if (GUILayout.Button("Tri Count " + (_sortMode == SortMode.ByTriCount ? $"({_sortOrder})" : string.Empty), EditorStyles.boldLabel, GUILayout.Width(125)))
                 {
                     if (_sortMode == SortMode.ByTriCount)
@@ -74,7 +90,7 @@ namespace Insthync.PerformanceImprovementTools
                     _sortMode = SortMode.ByTriCount;
                     SortMeshes();
                 }
-
+                GUILayout.FlexibleSpace();
                 if (GUILayout.Button("Prefab Usage " + (_sortMode == SortMode.ByUsage ? $"({_sortOrder})" : string.Empty), EditorStyles.boldLabel, GUILayout.Width(125)))
                 {
                     if (_sortMode == SortMode.ByUsage)
@@ -84,26 +100,33 @@ namespace Insthync.PerformanceImprovementTools
                     _sortMode = SortMode.ByUsage;
                     SortMeshes();
                 }
-
+                GUILayout.FlexibleSpace();
                 GUILayout.Label("Prefab ", EditorStyles.boldLabel, GUILayout.Width(200));
 
                 GUILayout.EndHorizontal();
 
                 _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
-                foreach (MeshInfo mesh in _meshes)
+                // Display current page of meshes
+                int startIndex = _currentPage * _itemsPerPage;
+                int endIndex = Mathf.Min(startIndex + _itemsPerPage, _meshes.Count);
+                for (int i = startIndex; i < endIndex; i++)
                 {
+                    MeshInfo mesh = _meshes[i];
                     GUILayout.BeginHorizontal();
                     // Object column
                     GUI.enabled = false;
                     EditorGUILayout.ObjectField(mesh.component, typeof(GameObject), false, GUILayout.Width(200));
                     GUI.enabled = true;
+                    GUILayout.FlexibleSpace();
                     // Tri count column
                     if (mesh.mesh != null)
                         GUILayout.Label(mesh.mesh.triangles.Length.ToString("N0"), GUILayout.Width(125));
                     else
                         GUILayout.Label("NULL", GUILayout.Width(125));
+                    GUILayout.FlexibleSpace();
                     // Usage column
                     GUILayout.Label(GetUsage(mesh).ToString("N0"), GUILayout.Width(125));
+                    GUILayout.FlexibleSpace();
                     // Prefab column
                     GUI.enabled = false;
                     EditorGUILayout.ObjectField(mesh.prefab, typeof(GameObject), false, GUILayout.Width(200));
