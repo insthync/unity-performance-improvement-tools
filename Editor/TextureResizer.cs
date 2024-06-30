@@ -216,6 +216,8 @@ namespace Insthync.PerformanceImprovementTools
             int xOffset = (newWidth - texture.width) / 2;
             int yOffset = (newHeight - texture.height) / 2;
 
+            Debug.Log($"Resizing texture (increase canvas): {texture.name} to {newWidth} x {newHeight}, from {texture.width} x {texture.height}, offsets {xOffset} x {yOffset}");
+
             // Blit the original texture to the render texture at the calculated offsets
             Graphics.Blit(texture, rt, new Vector2(1, 1), new Vector2(xOffset, yOffset));
 
@@ -233,6 +235,8 @@ namespace Insthync.PerformanceImprovementTools
         {
             RenderTexture rt = RenderTexture.GetTemporary(newWidth, newHeight, 0, RenderTextureFormat.ARGB32);
             RenderTexture.active = rt;
+
+            Debug.Log($"Resizing texture (stretch): {texture.name} to {newWidth} x {newHeight}, from {texture.width} x {texture.height}");
 
             // Blit the original texture to the render texture with resizing
             Graphics.Blit(texture, rt);
