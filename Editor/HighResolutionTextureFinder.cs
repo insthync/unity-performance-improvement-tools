@@ -140,21 +140,17 @@ namespace Insthync.PerformanceImprovementTools
                 return;
             }
 
-            string[] files = Directory.GetFiles(_selectedFolderPath, "*.*", SearchOption.AllDirectories);
-            foreach (string file in files)
+            string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { _selectedFolderPath });
+            foreach (string guid in guids)
             {
-                if (file.EndsWith(".png") || file.EndsWith(".jpg") || file.EndsWith(".tga") || file.EndsWith(".psd") || file.EndsWith(".exr") || file.EndsWith(".hdr"))
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (texture != null && ShouldResize(texture.width, texture.height))
                 {
-                    string assetPath = file.Replace(Application.dataPath, "Assets").Replace(Path.DirectorySeparatorChar, '/');
-                    Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                    if (texture != null && ShouldResize(texture.width, texture.height))
-                    {
-                        _highResTextures.Add(texture);
-                        _textureSelections.Add(false); // Initialize the selection list
-                    }
+                    _highResTextures.Add(texture);
+                    _textureSelections.Add(false);
                 }
             }
-
             Debug.Log($"Found {_highResTextures.Count} high resolution textures in the selected folder.");
 
             // Reset pagination
