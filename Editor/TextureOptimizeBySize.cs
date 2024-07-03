@@ -212,14 +212,31 @@ namespace Insthync.PerformanceImprovementTools
             // Clear the render texture with transparent color
             GL.Clear(true, true, Color.clear);
 
-            // Calculate offsets to center the original texture
-            int xOffset = (newWidth - texture.width) / 2;
-            int yOffset = (newHeight - texture.height) / 2;
-
-            Debug.Log($"Resizing texture (increase canvas): {texture.name} to {newWidth} x {newHeight}, from {texture.width} x {texture.height}, offsets {xOffset} x {yOffset}");
+            Vector2 scale = Vector2.one;
+            Vector2 blitOffsets = Vector2.zero;
+            if (!Mathf.Approximately(newWidth, newHeight))
+            {
+                if (newWidth > newHeight)
+                {
+                    // Width > Height
+                    float hScale = (float)newHeight / (float)texture.height;
+                    float hOffsets = (1f - hScale) * 0.5f;
+                    scale = new Vector2(1f, hScale);
+                    blitOffsets = new Vector2(0, hOffsets);
+                }
+                else
+                {
+                    // Width < Height
+                    float wScale = (float)newWidth / (float)texture.width;
+                    float wOffsets = (1f - wScale) * 0.5f;
+                    scale = new Vector2(wScale, 1f);
+                    blitOffsets = new Vector2(wOffsets, 0);
+                }
+            }
+            Debug.Log($"Resizing texture (increase canvas): {texture.name} to {newWidth} x {newHeight}, from {texture.width} x {texture.height}");
 
             // Blit the original texture to the render texture at the calculated offsets
-            Graphics.Blit(texture, rt, new Vector2(1, 1), new Vector2(xOffset, yOffset));
+            Graphics.Blit(texture, rt, scale, blitOffsets);
 
             Texture2D resizedTexture = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, false);
             resizedTexture.ReadPixels(new Rect(0, 0, newWidth, newHeight), 0, 0);
