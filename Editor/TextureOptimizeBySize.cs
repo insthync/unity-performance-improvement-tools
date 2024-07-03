@@ -240,6 +240,37 @@ namespace Insthync.PerformanceImprovementTools
 
             Texture2D resizedTexture = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, false);
             resizedTexture.ReadPixels(new Rect(0, 0, newWidth, newHeight), 0, 0);
+            if (!Mathf.Approximately(newWidth, newHeight))
+            {
+                int xOffset = (newWidth - texture.width) / 2;
+                int yOffset = (newHeight - texture.height) / 2;
+                if (newWidth > newHeight)
+                {
+                    for (int y = 0; y < newHeight; ++y)
+                    {
+                        if (y < yOffset || y > newHeight - yOffset)
+                        {
+                            for (int x = 0; x < newWidth; ++x)
+                            {
+                                resizedTexture.SetPixel(x, y, Color.clear);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    for (int x = 0; x < newWidth; ++x)
+                    {
+                        if (x < xOffset || x > newWidth - xOffset)
+                        {
+                            for (int y = 0; y < newHeight; ++y)
+                            {
+                                resizedTexture.SetPixel(x, y, Color.clear);
+                            }
+                        }
+                    }
+                }
+            }
             resizedTexture.Apply();
 
             RenderTexture.active = null;
