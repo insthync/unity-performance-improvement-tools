@@ -1,12 +1,11 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
 
 namespace Insthync.PerformanceImprovementTools
 {
-    public class HighResolutionTextureFinder : EditorWindow
+    public class BigTextureFinderAndResizer : EditorWindow
     {
         private List<int> _resolutionThresholds = new List<int> { 1024, 512 };
         private List<int> _resizeValues = new List<int> { 512, 256 };
@@ -18,16 +17,14 @@ namespace Insthync.PerformanceImprovementTools
         private string _selectedFolderPath = "";
         private string _backupFolderPath = "";
 
-        [MenuItem("Tools/High Resolution Texture Finder and Resizer")]
+        [MenuItem("Tools/Performance Tools/Big Texture Finder and Resizer")]
         public static void ShowWindow()
         {
-            GetWindow<HighResolutionTextureFinder>("Texture Finder and Resizer");
+            GetWindow<BigTextureFinderAndResizer>("Big Texture Finder and Resizer");
         }
 
         private void OnGUI()
         {
-            GUILayout.Label("High Resolution Texture Finder and Resizer", EditorStyles.boldLabel);
-
             GUILayout.Label("Resolution Thresholds and Resize Values", EditorStyles.boldLabel);
             for (int i = 0; i < _resolutionThresholds.Count; i++)
             {

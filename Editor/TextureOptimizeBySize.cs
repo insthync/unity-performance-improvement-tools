@@ -5,7 +5,7 @@ using System.IO;
 
 namespace Insthync.PerformanceImprovementTools
 {
-    public class TextureResizer : EditorWindow
+    public class TextureOptimizeBySize : EditorWindow
     {
         private enum SizeOption
         {
@@ -29,10 +29,10 @@ namespace Insthync.PerformanceImprovementTools
         private string _selectedFolderPath = "";
         private string _backupFolderPath = "";
 
-        [MenuItem("Tools/Texture Resizer")]
+        [MenuItem("Tools/Performance Tools/Texture Optimize By Size")]
         public static void ShowWindow()
         {
-            GetWindow<TextureResizer>("Texture Resizer");
+            GetWindow<TextureOptimizeBySize>("Texture Optimize By Size");
         }
 
         private void OnGUI()
