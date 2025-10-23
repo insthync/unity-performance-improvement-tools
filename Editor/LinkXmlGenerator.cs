@@ -102,13 +102,10 @@ namespace Insthync.PerformanceImprovementTools
                     }
                 }
 
+                var config = LinkXmlGeneratorConfig.GetConfig();
+
                 // Always preserve known reflection-based assemblies (remove .dll if present)
-                var alwaysPreserveAssemblies = new List<string>
-                {
-                    "Newtonsoft.Json",
-                    "Unity.Addressables",
-                    "Unity.ResourceManager"
-                };
+                var alwaysPreserveAssemblies = config.alwaysPreserveAssemblies;
 
                 string linkXmlPath = Path.Combine(Application.dataPath, "link.xml");
                 using (var sw = new StreamWriter(linkXmlPath, false))
@@ -127,6 +124,9 @@ namespace Insthync.PerformanceImprovementTools
                         string cleanAssemblyName = kv.Key.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
                             ? kv.Key.Substring(0, kv.Key.Length - 4)
                             : kv.Key;
+
+                        if (config.IsExcludeAssemblyName(cleanAssemblyName))
+                            continue;
 
                         sw.WriteLine($"  <assembly fullname=\"{cleanAssemblyName}\">");
                         foreach (var ns in kv.Value.OrderBy(x => x))
