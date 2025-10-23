@@ -1,126 +1,165 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using UnityEditor;
-using UnityEngine;
+using System.Text.RegularExpressions;
 using System.Collections.Generic;
+using UnityEditor;
+using UnityEditor.Compilation;
+using UnityEngine;
 
-public static class LinkXmlGenerator
+namespace Insthync.PerformanceImprovementTools
 {
-    // Common reflection calls to detect
-    private static readonly string[] ReflectionKeywords =
+    public static class LinkXmlGenerator
     {
-        "System.Type::GetType",
-        "System.Reflection.MethodInfo::Invoke",
-        "System.Reflection.PropertyInfo::GetValue",
-        "System.Reflection.PropertyInfo::SetValue",
-        "System.Reflection.FieldInfo::GetValue",
-        "System.Reflection.FieldInfo::SetValue",
-        "System.Activator::CreateInstance",
-        "System.Reflection.Assembly::Load",
-        "System.Reflection.Assembly::GetType",
-        "System.Reflection.MemberInfo::InvokeMember"
-    };
+        private static readonly string[] ReflectionPatterns = new[]
+        {
+            "Type.GetType(",
+            "System.Type.GetType(",
+            "Activator.CreateInstance(",
+            ".GetMethod(",
+            ".GetProperty(",
+            ".GetField(",
+            ".Invoke(",
+            "Assembly.Load(",
+            "Assembly.GetType(",
+            "InvokeMember(",
+            "GetValue(",
+            "SetValue(",
+            "JsonConvert.",
+            "FromJson<",
+            "Addressables.",
+            "CreateInstance(",
+        };
 
-    [MenuItem("Tools/Generate link.xml From Reflection Usage")]
-    public static void GenerateLinkXml()
-    {
-        Debug.Log("Scanning assemblies for reflection usage to generate link.xml ...");
+        private static readonly Regex nsRegex = new Regex(@"^\s*namespace\s+([A-Za-z0-9_.]+)", RegexOptions.Compiled);
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a =>
-                !a.FullName.StartsWith("UnityEditor") &&
-                !a.FullName.StartsWith("UnityEngine") &&
-                !a.IsDynamic)
-            .ToArray();
-
-        // This will hold all assemblies/namespaces/types detected
-        Dictionary<string, HashSet<string>> assemblyToNamespaces = new Dictionary<string, HashSet<string>>();
-
-        int totalHits = 0;
-
-        foreach (var assembly in assemblies)
+        [MenuItem("Tools/Performance Tools/Generate link.xml From Reflection Usage")]
+        public static void GenerateLinkXml()
         {
             try
             {
-                var types = assembly.GetTypes();
-                foreach (var type in types)
+                Debug.Log("Scanning scripts for reflection usage...");
+
+                string[] guids = AssetDatabase.FindAssets("t:MonoScript");
+                var assemblyToNamespaces = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                var matches = new List<string>();
+
+                foreach (string guid in guids)
                 {
-                    MethodInfo[] methods;
-                    try
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(path);
+                    if (script == null) continue;
+
+                    // Use CompilationPipeline to get the exact assembly name
+                    string assemblyName = CompilationPipeline.GetAssemblyNameFromScriptPath(path);
+
+                    // Fallback for scripts not recognized by CompilationPipeline
+                    if (string.IsNullOrEmpty(assemblyName))
+                        assemblyName = path.Contains("/Editor/") ? "Assembly-CSharp-Editor" : "Assembly-CSharp";
+
+                    // Strip any ".dll" suffix automatically
+                    if (assemblyName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                        assemblyName = assemblyName.Substring(0, assemblyName.Length - 4);
+
+                    string[] lines = File.ReadAllLines(path);
+                    string fileNamespace = null;
+                    bool fileHasReflectionUse = false;
+
+                    for (int i = 0; i < lines.Length; i++)
                     {
-                        methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-                    }
-                    catch
-                    {
-                        continue;
-                    }
+                        string line = lines[i];
+                        if (string.IsNullOrWhiteSpace(line)) continue;
 
-                    foreach (var method in methods)
-                    {
-                        if (method == null) continue;
-                        var body = method.GetMethodBody();
-                        if (body == null) continue;
-
-                        var il = body.GetILAsByteArray();
-                        if (il == null) continue;
-
-                        string disasm = BitConverter.ToString(il);
-
-                        foreach (string keyword in ReflectionKeywords)
+                        if (fileNamespace == null)
                         {
-                            if (disasm.Contains("Call") && disasm.Contains(keyword))
+                            var m = nsRegex.Match(line);
+                            if (m.Success) fileNamespace = m.Groups[1].Value;
+                        }
+
+                        if (line.TrimStart().StartsWith("//")) continue;
+
+                        foreach (var pattern in ReflectionPatterns)
+                        {
+                            if (line.Contains(pattern))
                             {
-                                if (!assemblyToNamespaces.TryGetValue(assembly.GetName().Name, out var namespaces))
-                                {
-                                    namespaces = new HashSet<string>();
-                                    assemblyToNamespaces[assembly.GetName().Name] = namespaces;
-                                }
-
-                                if (!string.IsNullOrEmpty(type.Namespace))
-                                    namespaces.Add(type.Namespace);
-
-                                totalHits++;
+                                fileHasReflectionUse = true;
+                                matches.Add($"{path} (line {i + 1}): {line.Trim()}");
                             }
                         }
                     }
+
+                    if (fileHasReflectionUse)
+                    {
+                        string ns = string.IsNullOrEmpty(fileNamespace) ? "<global>" : fileNamespace;
+
+                        if (!assemblyToNamespaces.TryGetValue(assemblyName, out var set))
+                        {
+                            set = new HashSet<string>();
+                            assemblyToNamespaces[assemblyName] = set;
+                        }
+                        set.Add(ns);
+                    }
                 }
+
+                // Always preserve known reflection-based assemblies (remove .dll if present)
+                var alwaysPreserveAssemblies = new List<string>
+                {
+                    "Newtonsoft.Json",
+                    "Unity.Addressables",
+                    "Unity.ResourceManager"
+                };
+
+                string linkXmlPath = Path.Combine(Application.dataPath, "link.xml");
+                using (var sw = new StreamWriter(linkXmlPath, false))
+                {
+                    sw.WriteLine("<linker>");
+
+                    foreach (var a in alwaysPreserveAssemblies)
+                    {
+                        string cleanName = a.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? a.Substring(0, a.Length - 4) : a;
+                        sw.WriteLine($"  <assembly fullname=\"{cleanName}\" preserve=\"all\" />");
+                    }
+                    sw.WriteLine();
+
+                    foreach (var kv in assemblyToNamespaces.OrderBy(k => k.Key))
+                    {
+                        string cleanAssemblyName = kv.Key.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                            ? kv.Key.Substring(0, kv.Key.Length - 4)
+                            : kv.Key;
+
+                        sw.WriteLine($"  <assembly fullname=\"{cleanAssemblyName}\">");
+                        foreach (var ns in kv.Value.OrderBy(x => x))
+                        {
+                            if (ns == "<global>")
+                                sw.WriteLine("    <!-- types in global namespace detected -->");
+                            else
+                                sw.WriteLine($"    <namespace fullname=\"{ns}\" preserve=\"all\" />");
+                        }
+                        sw.WriteLine("  </assembly>");
+                    }
+
+                    sw.WriteLine("</linker>");
+                }
+
+                string reportPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ReflectionReport.txt");
+                using (var sw = new StreamWriter(reportPath, false))
+                {
+                    sw.WriteLine($"Reflection Usage Report - {DateTime.Now}");
+                    sw.WriteLine("Scanned scripts: " + guids.Length);
+                    sw.WriteLine("Reflection usages found: " + matches.Count);
+                    sw.WriteLine();
+                    foreach (var line in matches)
+                        sw.WriteLine(line);
+                }
+
+                AssetDatabase.Refresh();
+                Debug.Log("link.xml generated at Assets/link.xml. ReflectionReport.txt generated at project root.");
+                EditorUtility.RevealInFinder(linkXmlPath);
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"Skipped assembly {assembly.FullName}: {ex.Message}");
+                Debug.LogError("Error generating link.xml: " + ex);
             }
         }
-
-        // Generate link.xml text
-        string xmlPath = Path.Combine(Application.dataPath, "link.xml");
-        using (StreamWriter writer = new StreamWriter(xmlPath, false))
-        {
-            writer.WriteLine("<linker>");
-
-            foreach (var kv in assemblyToNamespaces)
-            {
-                writer.WriteLine($"  <assembly fullname=\"{kv.Key}\">");
-                foreach (var ns in kv.Value.OrderBy(x => x))
-                {
-                    writer.WriteLine($"    <namespace fullname=\"{ns}\" preserve=\"all\" />");
-                }
-                writer.WriteLine("  </assembly>");
-            }
-
-            writer.WriteLine("</linker>");
-        }
-
-        if (totalHits == 0)
-        {
-            Debug.Log($"No reflection usage detected. No link.xml was generated (your game is safe).");
-        }
-        else
-        {
-            Debug.LogWarning($"Found {totalHits} reflection usages. Generated link.xml with {assemblyToNamespaces.Count} assemblies at:\n{xmlPath}");
-        }
-
-        EditorUtility.RevealInFinder(xmlPath);
     }
 }
