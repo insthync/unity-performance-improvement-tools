@@ -131,6 +131,9 @@ namespace Insthync.PerformanceImprovementTools
                         sw.WriteLine($"  <assembly fullname=\"{cleanAssemblyName}\">");
                         foreach (var ns in kv.Value.OrderBy(x => x))
                         {
+                            if (config.IsExcludeNamespace(ns))
+                                continue;
+
                             if (ns == "<global>")
                                 sw.WriteLine("    <!-- types in global namespace detected -->");
                             else

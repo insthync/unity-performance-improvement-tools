@@ -26,6 +26,17 @@ namespace Insthync.PerformanceImprovementTools
         public List<string> assemblyNameExcludePatterns = new List<string>()
         {
             "Editor",
+            "Demo",
+            "Example",
+            "Sample",
+        };
+
+        public List<string> namespaceExcludePatterns = new List<string>()
+        {
+            "Editor",
+            "Demo",
+            "Example",
+            "Sample",
         };
 
         public static LinkXmlGeneratorConfig GetConfig()
@@ -60,6 +71,16 @@ namespace Insthync.PerformanceImprovementTools
         public bool IsExcludeAssemblyName(string name)
         {
             foreach (var pattern in assemblyNameExcludePatterns)
+            {
+                if (name.ToLower().Contains(pattern.ToLower()))
+                    return true;
+            }
+            return false;
+        }
+
+        public bool IsExcludeNamespace(string name)
+        {
+            foreach (var pattern in namespaceExcludePatterns)
             {
                 if (name.ToLower().Contains(pattern.ToLower()))
                     return true;
