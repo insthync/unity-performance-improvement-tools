@@ -83,7 +83,8 @@ namespace Insthync.PerformanceImprovementTools
                             if (line.Contains(pattern))
                             {
                                 fileHasReflectionUse = true;
-                                matches.Add($"{path} (line {i + 1}): {line.Trim()}");
+                                string ns = string.IsNullOrEmpty(fileNamespace) ? "<global>" : fileNamespace;
+                                matches.Add($"{path} (line {i + 1}), (namespace {ns}): {line.Trim()}");
                             }
                         }
                     }
